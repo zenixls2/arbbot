@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "arbbot"
+version = "0.1.0"
+description = ""
+authors = ["zenix"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+ccxt = "^4.1.51"
+python-dotenv = "^1.0.0"
+ruamel-yaml = "^0.18.5"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

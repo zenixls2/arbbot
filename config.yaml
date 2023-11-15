@@ -1,0 +1,3 @@
+exchanges:
+  - coinspot: ["BTC/AUD"]
+  - independentreserve: ["Xbt-aud"]
