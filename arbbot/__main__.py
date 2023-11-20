@@ -3,9 +3,9 @@ from ruamel.yaml import YAML
 from pathlib import Path
 import argparse
 import ccxt.async_support as ccxt
-import asyncio
 from config import Config
 from app import main
+import sys, os
 
 yaml = YAML()
 
@@ -37,5 +37,4 @@ if __name__ == "__main__":
                 _name, _value = next(iter(n.items()))
                 reverse_map[pair][_name] = _value
         configs[name] = Config(name, key, secret, pair)
-
-    asyncio.run(main(configs, reverse_map))
+    main(configs, reverse_map)
