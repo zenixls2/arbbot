@@ -4,7 +4,8 @@ from pathlib import Path
 import argparse
 import ccxt.async_support as ccxt
 from config import Config
-from app import main
+#from app import main
+from first_strategy import main
 import sys, os
 
 yaml = YAML()
