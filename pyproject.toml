@@ -11,6 +11,7 @@ ccxt = "^4.1.51"
 python-dotenv = "^1.0.0"
 ruamel-yaml = "^0.18.5"
 aiohttp = "^3.9.0"
+pyglet = "^2.0.10"
 
 
 [build-system]

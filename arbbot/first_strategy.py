@@ -6,7 +6,12 @@ import threading
 import atexit
 import copy
 import traceback
+import pyglet
+import os
 from noexcept import lambda_noexcept, ob_noexcept, noreturn_noexcept
+
+absolute_path = os.path.dirname(__file__)
+sound = pyglet.media.load(os.path.join(absolute_path, "..", "alert.mp3"), streaming=False)
 
 trade_queue = asyncio.Queue()
 executor = concurrent.futures.ThreadPoolExecutor()
@@ -172,9 +177,38 @@ async def create_limit_sell_order(exchange, pair, amount, price):
     headers = None
     body = None
     info = exchange.markets[pair]
-    params = {"cointype": info["base"], "amount": amount, "rate": price, "markettype": "AUD"}
+    params = {"cointype": info["base"], "amount": amount, "rate": price, "markettype": info["quote"]}
+    print(f"sell param: {params}")
+    req = exchange.sign(path, api, method, params, headers, body)
+    try:
+        order = await exchange.fetch(req['url'], req['method'], req['headers'], req['body'])
+        return order
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+async def open_orders(exchange, pair):
+    path = "v2/ro/my/orders/limit/open"
+    api = "private"
+    method = "POST"
+    headers = None
+    body = None
+    info = exchange.markets[pair]
+    params = {"cointype": info["base"]}
+    print(f"open order param: {params}")
     req = exchange.sign(path, api, method, params, headers, body)
     return await exchange.fetch(req['url'], req['method'], req['headers'], req['body'])
+
+
+async def cancel_all(exchange, pair):
+    resp = await open_orders(exchange, pair)
+    if resp["status"] != "ok":
+        print("failed to query open orders")
+        return
+    for order in resp["sellorders"]:
+        oid = order["id"]
+        print(f"cancel {oid}...")
+        await exchange.cancel_order(oid, params={"side": "sell"})
 
 def take_profit():
     exchanges = {}
@@ -210,13 +244,18 @@ def take_profit():
                 last_price = None
                 continue
             try:
+                amount_float = min(_balances[e][exchange.markets[pair]["base"]]-0.0001, v)
+                if amount_float < 1:
+                    continue
                 sell_possible_amount = exchange.decimal_to_precision(
-                        min(_balances[e][exchange.markets[pair]["base"]], v), precision=4)
+                        amount_float, precision=4)
                 
-                if last_order_id is not None:
-                    print(f"cancel old order: {last_order_id}")
-                    # pair is not used
-                    await exchange.cancel_order(last_order_id, pair)
+                #if last_order_id is not None:
+                #    print(f"cancel old order: {last_order_id}")
+                #    # pair is not used
+                #    await exchange.cancel_order(last_order_id, params={"side": "sell"})
+
+                await cancel_all(exchange, pair)
 
                 # tick size is actually 0.00001
                 price = exchange.decimal_to_precision(p-0.0001, precision=4)
@@ -225,8 +264,10 @@ def take_profit():
                 #order = await exchange.create_limit_sell_order(pair, sell_possible_amount, price)
                 print(f"received create_order response: {order}")
                 if order["status"] == "error":
-                    raise Exception(f"query failed {order}")
+                    print(f"query failed {order}")
+                    continue
                 last_order_id = order["id"]
+                sound.play()
             except Exception as e:
                 print(f"takeprofit: {str(e)}")
                 traceback.print_exc()
