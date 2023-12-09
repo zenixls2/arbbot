@@ -40,6 +40,18 @@ And run the following to start:
 python arbbot
 ```
 
+## Check historical trades from coinspot
+
+```bash
+python dump_trades.py
+
+# -l LIMIT, --limit LIMIT: show latest LIMIT number of trades
+# -p PAIR, --pair PAIR: show PAIR trades. If PAIR=="*", show all trades
+# example: 
+#   python dump_trades.py -l 10 -p *
+#   python dump_trades.py -l 10 -p BTC/AUD
+```
+
 ## export requirements.txt
 
 ```bash

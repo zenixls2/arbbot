@@ -9,7 +9,8 @@ def lambda_noexcept(func):
 
 async def ob_noexcept(aw):
     try:
-        return await aw
+        result = await aw
+        return result
     except Exception as e:
         print("Failed to get ob", type(e).__name__, str(e))
         return {"bids": [], "asks": []}

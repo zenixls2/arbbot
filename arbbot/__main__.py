@@ -6,9 +6,16 @@ import ccxt.async_support as ccxt
 from config import Config
 #from app import main
 from first_strategy import main
+import logging
+import coloredlogs
 import sys, os
 
 yaml = YAML()
+
+LOGGING_FORMAT = "%(asctime)s [%(levelname)s][%(exchange)s][%(filename)s:%(lineno)d] %(message)s"
+os.environ['COLOREDLOGS_LOG_FORMAT'] = LOGGING_FORMAT
+log = logging.getLogger('arbbot')
+coloredlogs.install(milliseconds=True, level=logging.DEBUG, logger=log)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -21,6 +28,7 @@ if __name__ == "__main__":
     key_secrets = dict(dotenv_values(".envrc"))
     raw_config = yaml.load(config_path)
 
+    log.info("start program", extra={'exchange': 'all'})
     reverse_map = {}
     configs = {}
     # check

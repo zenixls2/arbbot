@@ -12,6 +12,8 @@ python-dotenv = "^1.0.0"
 ruamel-yaml = "^0.18.5"
 aiohttp = "^3.9.0"
 pyglet = "^2.0.10"
+colorama = "^0.4.6"
+coloredlogs = "^15.0.1"
 
 
 [build-system]
