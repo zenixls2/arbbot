@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: Create new release
+        required: true
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      [".github/workflows/**", "**/pyproject.toml", "**/*.py", "**/poetry.lock"]
+  pull_requests:
+    types: [opened, synchronize, reopened]
+    paths:
+      [".github/workflows/**", "**/pyproject.toml", "**/*.py", "**/poetry.lock"]
+
+env:
+  BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+
+jobs:
+  build:
+    name: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - run: python -m venv venv
+      - name: Build from powershell
+        shell: pwsh
+        run: |
+          .\venv\Scripts\Activate.ps1
+          pip install poetry
+          poetry install
+          poetry run build
+
+      - name: upload
+        if: ${{ ( github.event_name == 'push' && github.ref == 'refs/heads/main' ) }}
+        uses: actions/upload-artifact@v3
+        with:
+          path: |
+            dist/arbbot/

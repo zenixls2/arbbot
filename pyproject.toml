@@ -6,7 +6,7 @@ authors = ["zenix"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "~3.11"
 ccxt = "^4.1.51"
 python-dotenv = "^1.0.0"
 ruamel-yaml = "^0.18.5"
@@ -14,7 +14,10 @@ aiohttp = "^3.9.0"
 pyglet = "^2.0.10"
 colorama = "^0.4.6"
 coloredlogs = "^15.0.1"
+pyinstaller = "^6.3.0"
 
+[tool.poetry.scripts]
+build = "arbbot.pyinstaller:install"
 
 [build-system]
 requires = ["poetry-core"]
