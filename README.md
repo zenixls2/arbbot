@@ -1,3 +1,24 @@
+## Naive way of using prebuilt windows binary:
+
+Download artifacts from the github action tab. Uzip the artifact.zip, and put `.envrc` file inside the `arbbot` folder.
+
+```bash
+coinspot_key=xxx
+coinspot_secret=xxx
+independentreserve_key=xxx
+independentreserve_secret=xxx
+```
+
+You may also want to edit the config file, which is located in `_internal/config.yaml`. Or you could create another one in other folders and use parameter `-c {config_path}` to assign the path.
+
+And simply run using:
+
+```pwshell
+.\arbbot.exe
+```
+
+To kill the process, Ctrl+C doesn't work. Please open `Task Manager` and find `arbbot.exe` and click on `End the task`.
+
 ## Prepare
 
 Let's start from install poetry:
@@ -47,7 +68,7 @@ python dump_trades.py
 
 # -l LIMIT, --limit LIMIT: show latest LIMIT number of trades
 # -p PAIR, --pair PAIR: show PAIR trades. If PAIR=="*", show all trades
-# example: 
+# example:
 #   python dump_trades.py -l 10 -p *
 #   python dump_trades.py -l 10 -p BTC/AUD
 ```
