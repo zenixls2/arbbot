@@ -1,6 +1,6 @@
 ## Naive way of using prebuilt windows binary:
 
-Download artifacts from the github action tab. Uzip the artifact.zip, and put `.envrc` file inside the `arbbot` folder.
+Download artifacts from the github action tab. Uzip the artifact.zip, and put `.envrc` file inside the `artifact` folder. There's one `.envrc.example` file in the repository root. You could download and modify/rename it to `.envrc`.
 
 ```bash
 coinspot_key=xxx
