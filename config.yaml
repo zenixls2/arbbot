@@ -1,3 +1,24 @@
 exchanges:
   - coinspot: ["USDT/AUD"]
   - independentreserve: ["USDT/AUD"]
+
+strategy:
+  # taker fee percentage. In IR, it's 0.1%. If maker fee does exist, add it altogether.
+  feePercentage: 0.1
+
+  # only send order with pure profit at {profitPercentage}%,
+  # with position at the best ask from exchanges other than CS
+  # by default, 0.1%
+  profitPercentage: 0.1
+
+  # valid value: limit_size, fixed_size, free_ize
+  orderMode: "limit_size"
+
+  # order size setup. this value will be used in different cases dependens on orderMode value
+  orderSizeAud: 20
+
+  # on strategy start, cancel all the limit orders from previous session
+  cancelAllOnStart: True
+
+  # cancel non-traded order when next opportunity comes
+  cancelNonTradedOrder: True

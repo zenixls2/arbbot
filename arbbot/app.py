@@ -198,7 +198,7 @@ def take_profit():
         
 
 
-def main(configs, reverse_map):
+def main(configs, reverse_map, strategyConfig):
     main_loop = asyncio.get_event_loop()
     main_loop.run_until_complete(inner_main(configs, reverse_map))
 

@@ -31,6 +31,7 @@ if __name__ == "__main__":
     log.info("start program", extra={'exchange': 'all'})
     reverse_map = {}
     configs = {}
+    strategyConfig = raw_config.get("strategy", {})
     # check
     for exchange in raw_config["exchanges"]:
         name = next(iter(exchange.keys()))
@@ -46,4 +47,4 @@ if __name__ == "__main__":
                 _name, _value = next(iter(n.items()))
                 reverse_map[pair][_name] = _value
         configs[name] = Config(name, key, secret, pair)
-    main(configs, reverse_map)
+    main(configs, reverse_map, strategyConfig)

@@ -8,9 +8,21 @@ import copy
 import traceback
 import pyglet
 import os
+import signal
 from noexcept import lambda_noexcept, ob_noexcept, noreturn_noexcept
 import coinspot
 import logging
+from enum import StrEnum
+
+class OrderMode(StrEnum):
+    # every time when there's a opportunity, set fixed order size as orderSizeAud
+    FIXEDSIZE = "fixed_size"
+    # set the hard limit as orderSizeAud.
+    # if opponent order size is less than orderSizeAud, use opponent order size.
+    LIMITSIZE = "limit_size"
+    # free size means follow the opponent order size without limit.
+    # orderSizeAud will be ignored
+    FREESIZE = "free_size"
 
 log = logging.getLogger("arbbot")
 
@@ -18,7 +30,6 @@ absolute_path = os.path.dirname(__file__)
 sound = pyglet.media.load(os.path.join(absolute_path, "alert.mp3"), streaming=False)
 
 trade_queue = asyncio.Queue()
-executor = concurrent.futures.ThreadPoolExecutor()
 ob_fetch = []
 lock = threading.Lock()
 interval = 1
@@ -26,6 +37,8 @@ interval = 1
 balances = {}
 balances_lock = threading.Lock()
 ob_collect = {}
+
+running = True
 
 coinspot_usdt = {
     "id": "usdt",
@@ -38,8 +51,34 @@ coinspot_usdt = {
     "spot": True,
 }
 
+strategyParam = {
+    # taker fee percentage. In IR, it's 0.1%. If maker fee does exist, add it altogether.
+    "feePercentage": 0.1,
+    # only send order with pure profit at {profitPercentage}%,
+    # with position at the best ask from exchanges other than CS
+    # by default, 0.1%
+    "profitPercentage": 0.1,
+    # behavior setup when post an order
+    "orderMode": OrderMode.LIMITSIZE,
+    # order size setup. this value will be used in different cases dependens on orderMode value
+    "orderSizeAud": 20,
+    # on strategy start, cancel all the limit orders from previous session
+    "cancelAllOnStart": True,
+    # cancel non-traded order when next opportunity comes
+    "cancelNonTradedOrder": True,
+}
 
-async def inner_main(configs, reverse_map):
+
+async def inner_main(configs, reverse_map, strategyConfig):
+
+    # set parameter.
+    strategyParam["profitPercentage"] = strategyConfig.get("profitPercentage", 0.1)
+    strategyParam["orderMode"] = strategyConfig.get("orderMode", OrderMode.LIMITSIZE)
+    strategyParam["orderSizeAud"] = strategyConfig.get("orderSizeAud", 20)
+    strategyParam["cancelAllOnStart"] = strategyConfig.get("cancelAllOnStart", True)
+    strategyParam["cancelNonTradedOrder"] = strategyConfig.get("cancelNonTradedOrder", True)
+    strategyParam["feePercentage"] = strategyConfig.get("feePercentage", 0.1)
+
     for name, config in configs.items():
         module = importlib.import_module("ccxt.async_support")
         exchange_cls = getattr(module, name)
@@ -58,7 +97,7 @@ async def inner_main(configs, reverse_map):
         except Exception as e:
             log.error(f"exception {e}", extra={"exchange": name})
 
-    log.info(f"{configs} {reverse_map}", extra={"exchange": "all"})
+    log.info(f"{configs} {reverse_map} {strategyConfig}", extra={"exchange": "all"})
 
 
 def ob_done_callback(name, data):
@@ -86,8 +125,10 @@ def ob_done_callback(name, data):
             [bid, _] = data["bids"][0]
             # 0.1% of trading fee
             # we want to buy at best ask price
-            min_margin_sell = best_ask_price * 1.0001
-            if ask > min_margin_sell:
+            min_margin_sell = best_ask_price * (1.0 + \
+                    strategyParam["feePercentage"] / 100. + \
+                    strategyParam["profitPercentage"] / 100.)
+            if ask >= min_margin_sell:
                 # send ask - ticksize
                 chance = [
                     "coinspot",
@@ -99,8 +140,11 @@ def ob_done_callback(name, data):
 
 
 def _poll_orderbook(obj, time):
+    global running
+    if not running:
+        return
     loop = asyncio.get_running_loop()
-    [exchange, pair] = obj
+    [exchange, pair] = obj 
     loop.call_at(time + interval, _poll_orderbook, obj, time + interval)
     task = loop.create_task(ob_noexcept(exchange.fetch_order_book(pair, 20)))
 
@@ -121,6 +165,7 @@ def poll_orderbook(obj):
     [exchange_cls, settings, pair] = obj
 
     async def runner():
+        global running
         exchange = exchange_cls(settings)
         atexit.register(exit_handler, exchange)
         await exchange.load_markets()
@@ -129,7 +174,7 @@ def poll_orderbook(obj):
         loop = asyncio.get_running_loop()
         time = loop.time()
         loop.call_soon(_poll_orderbook, [exchange, pair], time)
-        while True:
+        while running:
             await asyncio.sleep(1)
 
     asyncio.run(runner())
@@ -174,7 +219,7 @@ def poll_balance():
         with balances_lock:
             balances = copy.deepcopy(_balances)
 
-        while True:
+        while running:
             aw_set = set()
             for ex, pair in exchanges:
                 aw_set.add(name_with_aw(ex.id, ex.fetch_balance()))
@@ -204,6 +249,8 @@ def take_profit():
 
     async def main_loop():
         global balances
+        global strategyParam
+        global running
         last_order_id = None
         last_price = None
         for ex, _ in exchanges.values():
@@ -211,9 +258,11 @@ def take_profit():
             if ex.id == "coinspot":
                 ex.markets["USDT/AUD"] = coinspot_usdt
 
-        # we cancel all the active orders on the market
-        await coinspot.cancel_all(*exchanges["coinspot"])
-        while True:
+        if strategyParam["cancelAllOnStart"]:
+            # we cancel all the active orders on the market
+            await coinspot.cancel_all(*exchanges["coinspot"])
+
+        while running:
             [e, p, v] = await trade_queue.get()
             if p == last_price:
                 log.info(f"same price: {p}, skip", extra={"exchange": "coinspot"})
@@ -230,11 +279,18 @@ def take_profit():
                 last_price = None
                 continue
             try:
-                await coinspot.cancel_all(exchange, pair)
+                if strategyParam["cancelNonTradedOrder"]:
+                    await coinspot.cancel_all(exchange, pair)
 
                 amount_float = min(
                     _balances[e][exchange.markets[pair]["base"]] * 0.9999, v
                 )
+                if strategyParam["orderMode"] == OrderMode.FIXEDSIZE:
+                    # if balance is not enough, error might occurr
+                    amount_float = strategyParam["orderSizeAud"]
+                elif strategyParam["orderMode"] == OrderMode.LIMITSIZE:
+                    amount_float = min(amount_float, strategyParam["orderSizeAud"])
+
                 if amount_float < 1:
                     log.info(
                         f"amount to trade is less than 1: {amount_float}",
@@ -242,6 +298,8 @@ def take_profit():
                     )
                     last_price = None
                     continue
+
+                # normalize the order size
                 sell_possible_amount = exchange.decimal_to_precision(
                     amount_float, precision=4
                 )
@@ -278,16 +336,27 @@ def take_profit():
     asyncio.run(main_loop())
 
 
-def main(configs, reverse_map):
+def main(configs, reverse_map, strategyConfig):
+    running = True
     main_loop = asyncio.get_event_loop()
-    main_loop.run_until_complete(inner_main(configs, reverse_map))
+    main_loop.run_until_complete(inner_main(configs, reverse_map, strategyConfig))
 
+    executor = concurrent.futures.ThreadPoolExecutor()
+    
+    def signal_handler(sig, frame):
+        global running
+        running = False
+        executor.shutdown(True)
+
+    signal.signal(signal.SIGINT, signal_handler)
     futures = set()
     for obj in ob_fetch:
         futures.add(executor.submit(poll_orderbook, obj))
 
     futures.add(executor.submit(take_profit))
     futures.add(executor.submit(poll_balance))
+
+    atexit.register(executor.shutdown, False)
 
     for fut in futures:
         fut.result()
