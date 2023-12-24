@@ -11,7 +11,12 @@ strategy:
   # by default, 0.1%
   profitPercentage: 0.1
 
-  # valid value: limit_size, fixed_size, free_ize
+  # valid value: limit_size, fixed_size, free_size
+  # fixed_size: every time when there's a opportunity, set fixed order size as orderSizeAud
+  # limit_size: set the hard limit as orderSizeAud.
+  #   if opponent order size is less than orderSizeAud, use opponent order size.
+  # free_size: free size means follow the opponent order size without limit.
+  #   orderSizeAud will be ignored
   orderMode: "limit_size"
 
   # order size setup. this value will be used in different cases dependens on orderMode value
