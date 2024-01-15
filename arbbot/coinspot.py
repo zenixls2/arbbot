@@ -20,7 +20,7 @@ async def create_limit_sell_order(exchange, pair, amount, price):
         return {"status": "error", "message": str(e)}
 
 async def open_orders(exchange, pair):
-    path = "v2/ro/my/orders/limit/open"
+    path = "v2/ro/my/orders/market/open"
     api = "private"
     method = "POST"
     headers = None
@@ -53,3 +53,45 @@ async def cancel_all(exchange, pair):
         oid = order["id"]
         log.info(f"cancel {oid}...", extra={'exchange': 'coinspot'})
         await exchange.cancel_order(oid, params={"side": "sell"})
+    for order in resp["buyorders"]:
+        oid = order["id"]
+        log.info("cancel {oid}...", extra={'exchange': 'coinspot'})
+        await exchange.cancel_order(oid, params={"side": "buy"})
+
+if __name__ == "__main__":
+    from dotenv import dotenv_values
+    import ccxt.async_support as ccxt
+    import asyncio
+    # for test purpose, please put valid key/value pairs in .envrc
+    # pattern:
+    # coinspot_key=xxxxxx
+    # coinspot_secret=xxxxxxxxxx
+    key_secrets = dict(dotenv_values(".envrc"))
+    setting = {
+        "apiKey": key_secrets['coinspot_key'],
+        "secret": key_secrets['coinspot_secret'],
+        "enableRateLimit": True,
+        "nonce": lambda: ccxt.Exchange.microseconds() * 1000,
+    }
+    async def run():
+        ex = ccxt.coinspot(setting)
+        ex.markets["USDT/AUD"] = coinspot_usdt = {
+            "id": "usdt",
+            "symbol": "USDT/AUD",
+            "base": "USDT",
+            "quote": "AUD",
+            "baseId": "usdt",
+            "quoteId": "aud",
+            "type": "spot",
+            "spot": True,
+        }
+        await ex.load_markets()
+        value = (ex, "USDT/AUD")
+        #r = await completed_orders(ex, "USDT/AUD")
+        #print(r)
+        #print(await ex.cancel_order("65a4b7df20c0f44a75895d7d", params={"side": "sell"}))
+        #print(await create_limit_sell_order(ex, "USDT/AUD", 20, 1.55))
+        #print(await open_orders(ex, "USDT/AUD"))
+        #await cancel_all(*value)
+        await ex.close()
+    asyncio.run(run())
